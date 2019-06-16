@@ -6,7 +6,7 @@
 
 FeasibilityPump is a Julia package that solve a linear program with binary variables. It uses the Feasibility Pump heuristic or a variant.
 
-This package exports 2 functions: `readmps()` and `mpstomodel()`
+This package exports a few functions: `feasibilitypump()`, `setparamfp!()`, `getparamnamefp()`, `getparamfp()`, `initializeparametersfp()` and `__compilefp__()`
 
 ### Prerequisites
 
