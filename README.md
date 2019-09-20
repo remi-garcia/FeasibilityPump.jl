@@ -8,24 +8,19 @@ FeasibilityPump is a Julia package that solve a linear program with binary varia
 
 This package exports a few functions: `feasibilitypump()`, `setparamfp!()`, `getparamnamefp()`, `getparamfp()`, `initializeparametersfp()` and `__compilefp__()`
 
-### Prerequisites
-
-julia 1.0.0</br>
-CPLEX 0.5.0</br>
-LinearAlgebra</br>
-SparseArrays</br>
-Random</br>
-
 ### Installing
 
-TODO
+```julia
+julia> ] add https://github.com/remi-garcia/FeasibilityPump.jl
+julia> using FeasibilityPump
+```
 
 ## Running the first test
 
 ```julia
 julia> include("examples/main.jl")
 ```
-It should run over the .mps in data/
+It should run over the `.mps` in `/data` using CPLEX.
 
 ### Usage
 
