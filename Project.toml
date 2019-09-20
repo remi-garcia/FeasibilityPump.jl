@@ -1,0 +1,10 @@
+name = "FeasibilityPump"
+uuid = "9754bb52-db6f-11e9-1b8e-6f42f44c1f1d"
+authors = ["Rémi Garcia"]
+version = "0.1.0"
+
+[deps]
+CPLEX = "a076750e-1247-5638-91d2-ce28b192dca0"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
