@@ -1,36 +1,30 @@
 """
-    simplerounding!(xTilde::Vector{Float64}, xOverline::Vector{Float64},
-        timeStart::UInt, timeLim::Float64, indices::Vector{Int})
+    simplerounding!(x_tilde::Vector{Float64}, x_overline::Vector{Float64},
+        time_start::UInt, total_time_limit::Float64, indices::Vector{Int})
 
 The simple rounding round every variable to the nearest binary.
 """
 function simplerounding!(
-        xTilde::Vector{Float64},
-        xOverline::Vector{Float64},
-        timeStart::UInt,
-        timeLim::Float64,
+        x_tilde::Vector{Float64},
+        x_overline::Vector{Float64},
+        time_start::UInt,
+        total_time_limit::Float64,
         indices::Vector{Int},
         opts...
-        ;
-        compile::Bool = false
     )
-    if compile
-        return [NaN]
-    end
-
-    xTilde .= xOverline
+    x_tilde .= x_overline
     for i in indices
-        xTilde[i] = round(xTilde[i])
+        x_tilde[i] = round(x_tilde[i])
     end
-    return xTilde
+    return x_tilde
 end
 
 
 """
-    recursiverounding!(xTilde::Vector{Float64}, xOverline::Vector{Float64},
-        timeStart::UInt, timeLim::Float64, _indices::Vector{Int},
-        myModel::CPLEX.Model, indices::Vector{Int},
-        objectiveFunction::Vector{Float64})
+    recursiverounding!(x_tilde::Vector{Float64}, x_overline::Vector{Float64},
+        time_start::UInt, total_time_limit::Float64, _indices::Vector{Int},
+        model::CPLEX.Model, indices::Vector{Int},
+        objective_function::Vector{Float64})
 
 The recursive rounding round to the nearest. If that's not a feasible solution
 we try to found one fixing less and less variables. Then we round it to the
@@ -38,93 +32,81 @@ nearest. If that's still not a solution less variables are fixed and try again.
     See https://doi.org/10.1016/j.cor.2013.09.008
 """
 function recursiverounding!(
-        xTilde::Vector{Float64},
-        xOverline::Vector{Float64},
-        timeStart::UInt,
-        timeLim::Float64,
+        x_tilde::Vector{Float64},
+        x_overline::Vector{Float64},
+        time_start::UInt,
+        total_time_limit::Float64,
         _indices::Vector{Int},
-        myModel::CPLEX.Model,
+        model::CPLEX.Model,
         indices::Vector{Int},
-        objectiveFunction::Vector{Float64},
+        objective_function::Vector{Float64},
         opts...
-        ;
-        compile::Bool = false
     )
-    if compile
-        return [NaN]
-    end
-
-    timeStart = time_ns()
-    xTilde .= xOverline
-    isFeasible = false
+    time_start = time_ns()
+    x_tilde .= x_overline
+    is_feasible = false
     first = 1
-    nVars = length(indices)
-    last = nVars
-    CPLEX.set_obj!(myModel, objectiveFunction)
-    varLB_init = CPLEX.get_varLB(myModel)
-    varUB_init = CPLEX.get_varUB(myModel)
+    nb_variables = length(indices)
+    last = nb_variables
+    CPLEX.set_obj!(model, objective_function)
+    varLB_init = CPLEX.get_varLB(model)
+    varUB_init = CPLEX.get_varUB(model)
     varLB = copy(varLB_init)
     varUB = copy(varUB_init)
     for i in indices
-        xTilde[i] = round(xOverline[i])
+        x_tilde[i] = round(x_overline[i])
     end
 
     for i in indices[first:last]
-        varLB[i] = xTilde[i]
+        varLB[i] = x_tilde[i]
         varUB[i] = varLB[i]
     end
-    while !isFeasible && first < last && (time_ns()-timeStart)/1.0e9 < timeLim
-        CPLEX.set_varLB!(myModel, varLB)
-        CPLEX.set_varUB!(myModel, varUB)
-        CPLEX.set_param!(myModel.env, "CPX_PARAM_TILIM", maximum([0, timeLim - (time_ns() - timeStart) / 1.0e9]))
-        CPLEX.optimize!(myModel)
+    while !is_feasible && first < last && (time_ns()-time_start)/1.0e9 < total_time_limit
+        CPLEX.set_varLB!(model, varLB)
+        CPLEX.set_varUB!(model, varUB)
+        CPLEX.set_param!(model.env, "CPX_PARAM_TILIM", maximum([0, total_time_limit - (time_ns() - time_start) / 1.0e9]))
+        CPLEX.optimize!(model)
 
-        if CPLEX.get_status(myModel) == :CPX_STAT_OPTIMAL
-            isFeasible = true
+        if CPLEX.get_status(model) == :CPX_STAT_OPTIMAL
+            is_feasible = true
         end
 
-        if !isFeasible
+        if !is_feasible
             lastBis = last - round(Int, (last - first) / 2, RoundUp)
             for i in indices[(lastBis+1):last]
                 varLB[i] = varLB_init[i]
                 varUB[i] = varUB_init[i]
             end
             last = lastBis
-        elseif last != nVars
-            isFeasible = false
+        elseif last != nb_variables
+            is_feasible = false
             first = last+1
-            last = nVars
-            x = CPLEX.get_solution(myModel)
+            last = nb_variables
+            x = CPLEX.get_solution(model)
             for i in indices[(first+1):end]
-                xTilde[i] = round(x[i])
-                varLB[i] = xTilde[i]
+                x_tilde[i] = round(x[i])
+                varLB[i] = x_tilde[i]
                 varUB[i] = varLB[i]
             end
         end
     end
 
-    CPLEX.set_varLB!(myModel, varLB_init)
-    CPLEX.set_varUB!(myModel, varUB_init)
-    return xTilde
+    CPLEX.set_varLB!(model, varLB_init)
+    CPLEX.set_varUB!(model, varUB_init)
+    return x_tilde
 end
 
 """
-    sortReducedCosts!(indices::Vector{Int}, myModel::CPLEX.Model)
+    sortReducedCosts!(indices::Vector{Int}, model::CPLEX.Model)
 
-sortReducedCosts sort indices by decreasing absolute reduced costs for myModel.
+sortReducedCosts sort indices by decreasing absolute reduced costs for model.
 """
 function sortReducedCosts!(
         indices::Vector{Int},
-        myModel::CPLEX.Model
-        ;
-        compile = false
+        model::CPLEX.Model
     )
-    if compile
-        return [0]
-    end
-
     reducedCosts = Vector{Tuple{Int, Float64}}()
-    reducedCostsInit = CPLEX.get_reduced_costs(myModel)
+    reducedCostsInit = CPLEX.get_reduced_costs(model)
     for i in indices
         push!(reducedCosts, (i, abs(reducedCostsInit[i])))
     end

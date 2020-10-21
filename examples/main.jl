@@ -20,15 +20,15 @@ function mainBasic()
         for i in 1:nSeed
             GC.gc()
             Random.seed!(i)
-            myModel = CPLEX.Model(CPLEX.Env())
-            CPLEX.read_model(myModel, file)
-            CPLEX.set_param!(myModel.env, "CPX_PARAM_THREADS", 1)
+            model = CPLEX.Model(CPLEX.Env())
+            CPLEX.read_model(model, file)
+            CPLEX.set_param!(model.env, "CPX_PARAM_THREADS", 1)
 
             param = initializeparametersfp()
             #setparamfp!(param, "logLevel", 1)
 
             timeTmp = @timed begin
-                st, x, z = feasibilitypump(myModel, param)
+                st, x, z = feasibilitypump(model, param)
             end
             print("-Time: ")
             println(timeTmp[2])

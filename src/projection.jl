@@ -1,149 +1,131 @@
 """
-    minimumdistance(myModel::CPLEX.Model, timeStart::UInt, timeLim::Float64,
-        xTilde::Vector{Float64}, indices::Vector{Int})
+    minimumdistance(model::CPLEX.Model, time_start::UInt, total_time_limit::Float64,
+        x_tilde::Vector{Float64}, indices::Vector{Int})
 
-Replace the objective function to minimize the L1-distance to xTilde. Then
-optimize to return xOverline.
+Replace the objective function to minimize the L1-distance to x_tilde. Then
+optimize to return x_overline.
 """
 function minimumdistance(
-        myModel::CPLEX.Model,
-        timeStart::UInt,
-        timeLim::Float64,
-        xTilde::Vector{Float64},
+        model::CPLEX.Model,
+        time_start::UInt,
+        total_time_limit::Float64,
+        x_tilde::Vector{Float64},
         indices::Vector{Int},
         opts...
-        ;
-        compile::Bool = false
     )
-    if compile
-        return [NaN]
-    end
-
-    nVars = length(xTilde)
-    objectiveFunction = zeros(Float64, nVars)
+    nb_variables = length(x_tilde)
+    objective_function = zeros(Float64, nb_variables)
     for i in indices
-        if xTilde[i] > 0.5
-            objectiveFunction[i] = -1.0
+        if x_tilde[i] > 0.5
+            objective_function[i] = -1.0
         else
-            objectiveFunction[i] = 1.0
+            objective_function[i] = 1.0
         end
     end
-    CPLEX.set_obj!(myModel, objectiveFunction)
+    CPLEX.set_obj!(model, objective_function)
 
-    CPLEX.set_param!(myModel.env, "CPX_PARAM_TILIM", maximum([0, timeLim - (time_ns() - timeStart) / 1.0e9]))
-    CPLEX.optimize!(myModel)
+    CPLEX.set_param!(model.env, "CPX_PARAM_TILIM", maximum([0, total_time_limit - (time_ns() - time_start) / 1.0e9]))
+    CPLEX.optimize!(model)
 
-    xOverline = zeros(Float64, nVars)
-    if CPLEX.get_status(myModel) == :CPX_STAT_OPTIMAL
-        xOverline = CPLEX.get_solution(myModel)
+    x_overline = zeros(Float64, nb_variables)
+    if CPLEX.get_status(model) == :CPX_STAT_OPTIMAL
+        x_overline = CPLEX.get_solution(model)
     end
 
-    return xOverline
+    return x_overline
 end
 
 
 """
-    minimumdeltaalpha(myModel::CPLEX.Model, timeStart::UInt, timeLim::Float64,
-        xTilde::Vector{Float64}, indices::Vector{Int},
+    minimumdeltaalpha(model::CPLEX.Model, time_start::UInt, total_time_limit::Float64,
+        x_tilde::Vector{Float64}, indices::Vector{Int},
         initObjectiveFunction::Vector{Float64}, alpha::Float64, coef::Float64)
 
-Replace the objective function to minimize the L1-distance to xTilde taking into
-account the initial objective function. Then optimize to return xOverline.
+Replace the objective function to minimize the L1-distance to x_tilde taking into
+account the initial objective function. Then optimize to return x_overline.
 """
 function minimumdeltaalpha(
-        myModel::CPLEX.Model,
-        timeStart::UInt,
-        timeLim::Float64,
-        xTilde::Vector{Float64},
+        model::CPLEX.Model,
+        time_start::UInt,
+        total_time_limit::Float64,
+        x_tilde::Vector{Float64},
         indices::Vector{Int},
         initObjectiveFunction::Vector{Float64},
         alpha::Float64,
         coef::Float64,
         opts...
-        ;
-        compile::Bool = false
     )
-    if compile
-        return [NaN]
-    end
+    nb_variables = length(x_tilde)
 
-    nVars = length(xTilde)
-
-    # objectiveFunction minimumdistance
-    objectiveFunction = zeros(Float64, nVars)
+    # objective_function minimumdistance
+    objective_function = zeros(Float64, nb_variables)
     for i in indices
-        if xTilde[i] > 0.5
-            objectiveFunction[i] = -1.0
+        if x_tilde[i] > 0.5
+            objective_function[i] = -1.0
         else
-            objectiveFunction[i] = 1.0
+            objective_function[i] = 1.0
         end
     end
 
     # Add objective function and alpha to it
-    objectiveFunction .= (objectiveFunction .* (1-alpha)) .+ ((alpha*coef) .* initObjectiveFunction)
-    CPLEX.set_obj!(myModel, objectiveFunction)
+    objective_function .= (objective_function .* (1-alpha)) .+ ((alpha*coef) .* initObjectiveFunction)
+    CPLEX.set_obj!(model, objective_function)
 
-    CPLEX.set_param!(myModel.env, "CPX_PARAM_TILIM", maximum([0, timeLim - (time_ns() - timeStart) / 1.0e9]))
-    CPLEX.optimize!(myModel)
+    CPLEX.set_param!(model.env, "CPX_PARAM_TILIM", maximum([0, total_time_limit - (time_ns() - time_start) / 1.0e9]))
+    CPLEX.optimize!(model)
 
-    xOverline = zeros(Float64, nVars)
-    if CPLEX.get_status(myModel) == :CPX_STAT_OPTIMAL
-        xOverline = CPLEX.get_solution(myModel)
+    x_overline = zeros(Float64, nb_variables)
+    if CPLEX.get_status(model) == :CPX_STAT_OPTIMAL
+        x_overline = CPLEX.get_solution(model)
     end
 
-    return xOverline
+    return x_overline
 end
 
 
 """
-    minimumdistance_reduce(myModel::CPLEX.Model, timeStart::UInt,
-        timeLim::Float64, xTilde::Vector{Float64}, indices::Vector{Int})
+    minimumdistance_reduce(model::CPLEX.Model, time_start::UInt,
+        total_time_limit::Float64, x_tilde::Vector{Float64}, indices::Vector{Int})
 
-Replace the objective function to minimize the L1-distance to xTilde. Multiply
+Replace the objective function to minimize the L1-distance to x_tilde. Multiply
 the new objective function by the non zeros reduced costs. Then optimize to
-return xOverline.
+return x_overline.
 """
 function minimumdistance_reduce(
-        myModel::CPLEX.Model,
-        timeStart::UInt,
-        timeLim::Float64,
-        xTilde::Vector{Float64},
+        model::CPLEX.Model,
+        time_start::UInt,
+        total_time_limit::Float64,
+        x_tilde::Vector{Float64},
         indices::Vector{Int},
         opts...
-        ;
-        compile::Bool = false
     )
-    if compile
-        return [NaN]
-    end
-
-    nVars = length(xTilde)
+    nb_variables = length(x_tilde)
     reducedCosts = Vector{Float64}()
     try
-        reducedCosts = CPLEX.get_reduced_costs(myModel)
+        reducedCosts = CPLEX.get_reduced_costs(model)
     catch
-        reducedCosts = zeros(nVars)
+        reducedCosts = zeros(nb_variables)
     end
-    objectiveFunction = zeros(Float64, nVars)
+    objective_function = zeros(Float64, nb_variables)
     for i in indices
-        if xTilde[i] > 0.5
-            objectiveFunction[i] = -1.0
+        if x_tilde[i] > 0.5
+            objective_function[i] = -1.0
         else
-            objectiveFunction[i] = 1.0
+            objective_function[i] = 1.0
         end
         if abs(reducedCosts[i]) > 1e-8
-            objectiveFunction[i] *= abs(reducedCosts[i])
+            objective_function[i] *= abs(reducedCosts[i])
         end
     end
-    CPLEX.set_obj!(myModel, objectiveFunction)
+    CPLEX.set_obj!(model, objective_function)
 
-    CPLEX.set_param!(myModel.env, "CPX_PARAM_TILIM", maximum([0, timeLim - (time_ns() - timeStart) / 1.0e9]))
-    CPLEX.optimize!(myModel)
+    CPLEX.set_param!(model.env, "CPX_PARAM_TILIM", maximum([0, total_time_limit - (time_ns() - time_start) / 1.0e9]))
+    CPLEX.optimize!(model)
 
-    xOverline = zeros(Float64, nVars)
-    if CPLEX.get_status(myModel) == :CPX_STAT_OPTIMAL
-        xOverline = CPLEX.get_solution(myModel)
+    x_overline = zeros(Float64, nb_variables)
+    if CPLEX.get_status(model) == :CPX_STAT_OPTIMAL
+        x_overline = CPLEX.get_solution(model)
     end
 
-    return xOverline
+    return x_overline
 end

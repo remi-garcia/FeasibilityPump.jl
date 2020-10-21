@@ -25,11 +25,11 @@ It should run over the `.mps` in `/data` using CPLEX.
 ### Usage
 
 ```julia
-julia> myModel = CPLEX.Model(CPLEX.Env())
-julia> CPLEX.read_model(myModel, "filepath.mps")
+julia> model = CPLEX.Model(CPLEX.Env())
+julia> CPLEX.read_model(model, "filepath.mps")
 julia> param = initializeparametersfp()
 julia> #setparamfp!(param, "paramName", paramValue) # See docs for more info on this
-julia> status, solution, objectiveValue = feasibilitypump(myModel, param)
+julia> status, solution, objectiveValue = feasibilitypump(model, param)
 ```
 
 ### Problem Collections
