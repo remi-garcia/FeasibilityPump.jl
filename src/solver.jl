@@ -39,7 +39,7 @@ function feasibilitypump(
         model::Model,
         parameter::ParametersFP
     )
-    timeStart = time_ns()
+    starting_time = time_ns()
 
     rounding_method! = which_rounding[0]
     projection_method = which_projection[0]
@@ -66,11 +66,14 @@ function feasibilitypump(
         @warn("Invalid parameter for perturbation_method, default used")
     end
     restart = parameter.restart
-    pasRestart = 0
+    restart_step = 0
     check_cycle = parameter.check_cycle
     presolve = parameter.presolve
     improve = parameter.improve
-    total_time_limit = parameter.time_limit
+    total_time_limit = time_limit_sec(model)
+    if total_time_limit === nothing
+        total_time_limit = Inf
+    end
     feasibility_check = parameter.feasibility_check
 
     LPMethod_init = CPLEX.get_param(model.env, "CPX_PARAM_LPMETHOD")
@@ -244,9 +247,8 @@ function feasibilitypump(
     First linear relaxation, rounding and feasibility check
     --------------------------------------------------------------------------=#
     #CPLEX.set_obj!(model, zeros(Float64, nb_variables))
-    time_limit_init = CPLEX.get_param(model.env, "CPX_PARAM_TILIM")
-    CPLEX.set_param!(model.env, "CPX_PARAM_TILIM", maximum([0, total_time_limit - (time_ns() - timeStart) / 1.0e9]))
-    CPLEX.optimize!(model)
+    set_time_limit!(model, total_time_limit, starting_time)
+    optimize!(model)
 
     xOverline = zeros(Float64, nb_variables)
     if CPLEX.get_status(model) == :CPX_STAT_OPTIMAL
@@ -255,7 +257,10 @@ function feasibilitypump(
 
     isFeasible = false
     if feasibility_check != 2
-        isFeasible = isfeasible_xOverline(xOverline, indices, timeStart, total_time_limit)
+        isFeasible = isfeasible_xOverline(xOverline, indices, starting_time, total_time_limit)
+    end
+    if time_limit_sec(model) == 0.0
+        return false
     end
     nIter = 0
     xTilde = zeros(Float64, nb_variables)
@@ -270,7 +275,7 @@ function feasibilitypump(
 
         CPLEX.set_sense!(model, :Min)
 
-        rounding_method!(xTilde, xOverline, timeStart, total_time_limit, indices, model, indicesRR, objectiveFunctionRR)
+        rounding_method!(xTilde, xOverline, starting_time, total_time_limit, indices, model, indicesRR, objectiveFunctionRR)
         xTildeBis = copy(xTilde)
         for i in indices
             if xTilde[i] > 0.5
@@ -278,7 +283,7 @@ function feasibilitypump(
             end
         end
         if feasibility_check != 1
-            isFeasible = isfeasible_xTilde(xTilde, A, senses, rhs, timeStart, total_time_limit)
+            isFeasible = isfeasible_xTilde(xTilde, A, senses, rhs, starting_time, total_time_limit)
         end
     else
         xTilde .= xOverline
@@ -287,13 +292,13 @@ function feasibilitypump(
     #=--------------------------------------------------------------------------
     The feasibility pump
     --------------------------------------------------------------------------=#
-    while !isFeasible && (time_ns()-timeStart)/1.0e9 < total_time_limit
+    while !isFeasible && (time_ns()-starting_time)/1.0e9 < total_time_limit
         nIter += 1
-        pasRestart += 1
+        restart_step += 1
         alpha *= alphaChange
-        xOverline = projection_method(model, timeStart, total_time_limit, xTilde, indices, objective_function, alpha, coef)
+        xOverline = projection_method(model, starting_time, total_time_limit, xTilde, indices, objective_function, alpha, coef)
         feasibility_check != 2
-            isFeasible = isfeasible_xOverline(xOverline, indices, timeStart, total_time_limit)
+            isFeasible = isfeasible_xOverline(xOverline, indices, starting_time, total_time_limit)
         end
 
         if !isFeasible
@@ -301,16 +306,16 @@ function feasibilitypump(
                 sortReducedCosts!(indicesRR, model)
             end
 
-            rounding_method!(xTildeBis, xOverline, timeStart, total_time_limit, indices, model, indicesRR, objectiveFunctionRR)
-            if pasRestart == restart
-                pasRestart = 0
+            rounding_method!(xTildeBis, xOverline, starting_time, total_time_limit, indices, model, indicesRR, objectiveFunctionRR)
+            if restart_step == restart
+                restart_step = 0
                 restart_method!(xTildeBis, xOverline, indices)
             end
             if xTildeBis == xTilde
                 perturbmethod!(xTildeBis, xOverline, indices, TTmin, TTmax, freqRound, nIter)
             else
                 if xTildeBis in saveSol
-                    pasRestart = 0
+                    restart_step = 0
                     restart_method!(xTildeBis, xOverline, indices)
                 end
             end
@@ -326,7 +331,7 @@ function feasibilitypump(
                 end
             end
             if feasibility_check != 1
-                isFeasible = isfeasible_xTilde(xTilde, A, senses, rhs, timeStart, total_time_limit)
+                isFeasible = isfeasible_xTilde(xTilde, A, senses, rhs, starting_time, total_time_limit)
             end
         else
             xTilde .= xOverline
@@ -350,7 +355,7 @@ function feasibilitypump(
             CPLEX.set_varLB!(model, varLB)
             CPLEX.set_varUB!(model, varUB)
 
-            CPLEX.set_param!(model.env, "CPX_PARAM_TILIM", maximum([0, total_time_limit - (time_ns() - timeStart) / 1.0e9]))
+            set_time_limit!(model, total_time_limit, starting_time)
             CPLEX.optimize!(model)
             if CPLEX.get_status(model) == :CPX_STAT_OPTIMAL
                 xTilde = CPLEX.get_solution(model)
@@ -388,7 +393,7 @@ function isfeasible_xTilde(
         A::SparseArrays.SparseMatrixCSC{Float64,Int64},
         senses::Vector{Int8},
         rhs::Vector{Float64},
-        timeStart::UInt,
+        starting_time::UInt,
         total_time_limit::Float64
     )
     nb_variables::Int64, nConstr::Int64 = size(A)
@@ -416,8 +421,9 @@ function isfeasible_xTilde(
             end
         end
         i += 1
-        if (time_ns()-timeStart)/1.0e9 > total_time_limit
-            isFeasible = false
+        set_time_limit!(model, total_time_limit, starting_time)
+        if time_limit_sec(model) == 0.0
+            return false
         end
     end
 
@@ -427,7 +433,7 @@ end
 function isfeasible_xOverline(
         xOverline::Vector{Float64},
         indices::Vector{Int},
-        timeStart::UInt,
+        starting_time::UInt,
         total_time_limit::Float64
     )
     nBin = length(indices)
@@ -438,8 +444,9 @@ function isfeasible_xOverline(
         if abs(xOverline[i]-round(xOverline[i])) > 1e-8
             isFeasible = false
         end
-        if (time_ns()-timeStart)/1.0e9 > total_time_limit
-            isFeasible = false
+        set_time_limit!(model, total_time_limit, starting_time)
+        if time_limit_sec(model) == 0.0
+            return false
         end
         ind += 1
     end
