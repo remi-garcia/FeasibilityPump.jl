@@ -1,12 +1,12 @@
 """
-    minimumdistance(model::CPLEX.Model, time_start::UInt, total_time_limit::Float64,
+    minimum_distance(model::Model, time_start::UInt, total_time_limit::Float64,
         x_tilde::Vector{Float64}, indices::Vector{Int})
 
 Replace the objective function to minimize the L1-distance to x_tilde. Then
 optimize to return x_overline.
 """
-function minimumdistance(
-        model::CPLEX.Model,
+function minimum_distance(
+        model::Model,
         time_start::UInt,
         total_time_limit::Float64,
         x_tilde::Vector{Float64},
@@ -37,15 +37,15 @@ end
 
 
 """
-    minimumdeltaalpha(model::CPLEX.Model, time_start::UInt, total_time_limit::Float64,
+    minimum_delta_alpha(model::Model, time_start::UInt, total_time_limit::Float64,
         x_tilde::Vector{Float64}, indices::Vector{Int},
         initObjectiveFunction::Vector{Float64}, alpha::Float64, coef::Float64)
 
 Replace the objective function to minimize the L1-distance to x_tilde taking into
 account the initial objective function. Then optimize to return x_overline.
 """
-function minimumdeltaalpha(
-        model::CPLEX.Model,
+function minimum_delta_alpha(
+        model::Model,
         time_start::UInt,
         total_time_limit::Float64,
         x_tilde::Vector{Float64},
@@ -84,15 +84,15 @@ end
 
 
 """
-    minimumdistance_reduce(model::CPLEX.Model, time_start::UInt,
+    minimum_distance_reduce(model::Model, time_start::UInt,
         total_time_limit::Float64, x_tilde::Vector{Float64}, indices::Vector{Int})
 
 Replace the objective function to minimize the L1-distance to x_tilde. Multiply
 the new objective function by the non zeros reduced costs. Then optimize to
 return x_overline.
 """
-function minimumdistance_reduce(
-        model::CPLEX.Model,
+function minimum_distance_reduce(
+        model::Model,
         time_start::UInt,
         total_time_limit::Float64,
         x_tilde::Vector{Float64},

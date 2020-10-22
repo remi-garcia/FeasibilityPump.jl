@@ -3,17 +3,19 @@ Pertubation switchs binary variables: a switch means that a variable at value 0
 will be switched at value 1 and a variable at value 1 will be switched at
 value 0.
 """
-function noperturb(opts...) end
+
+
+function no_perturbation(opts...) end
 
 
 """
-    randomperturb!(x_tilde::Vector{Float64}, _x_overline::Vector{Float64},
+    random_perturbation!(x_tilde::Vector{Float64}, _x_overline::Vector{Float64},
         indices::Vector{Int})
 
 The random perturbation randomly switch variables. Each one has 50% chance to
 be switched.
 """
-function randomperturb!(
+function random_perturbation!(
         x_tilde::Vector{Float64},
         _x_overline::Vector{Float64},
         indices::Vector{Int},
@@ -29,13 +31,13 @@ end
 
 
 """
-    perturb!(x_tilde::Vector{Float64}, x_overline::Vector{Float64},
+    perturbation!(x_tilde::Vector{Float64}, x_overline::Vector{Float64},
         indices::Vector{Int}, TTmin::Int, TTmax::Int)
 
 The perturbation switch the TT most fractional variables. TT is randomly picked
 between TTmin to TTmax.
 """
-function perturb!(
+function perturbation!(
         x_tilde::Vector{Float64},
         x_overline::Vector{Float64},
         indices::Vector{Int},
@@ -59,14 +61,14 @@ end
 
 
 """
-    frequencyperturb!(x_tilde::Vector{Float64}, x_overline::Vector{Float64},
+    frequency_perturbation!(x_tilde::Vector{Float64}, x_overline::Vector{Float64},
         indices::Vector{Int}, TTmin::Int, TTmax::Int, frequency_round::Vector{Int},
         nb_iteration::Int)
 
 The frequency perturbation switch TT variables. The variables are chosen by
 frequency and TT is randomly picked between TTmin to TTmax..
 """
-function frequencyperturb!(
+function frequency_perturbation!(
         x_tilde::Vector{Float64},
         x_overline::Vector{Float64},
         indices::Vector{Int},
@@ -100,18 +102,18 @@ end
 #------------------------------------------------------------------------------#
 #------------------------------------------------------------------------------#
 
-function norestart(opts...) end
+function no_restart(opts...) end
 
 
 """
-    perturbRestart!(x_tilde::Vector{Float64}, x_overline::Vector{Float64},
+    perturbation_restart!(x_tilde::Vector{Float64}, x_overline::Vector{Float64},
         indices::Vector{Int})
 
 This perturbation replace the usual perturbation when a restart is needed, it is
 the restart chosen in The feasibility pump 2005 by M. Fischetti, F. Glover and
 A. Lodi
 """
-function perturbRestart!(
+function perturbation_restart!(
         x_tilde::Vector{Float64},
         x_overline::Vector{Float64},
         indices::Vector{Int},

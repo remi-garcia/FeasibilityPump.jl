@@ -4,7 +4,7 @@
 
 The simple rounding round every variable to the nearest binary.
 """
-function simplerounding!(
+function simple_rounding!(
         x_tilde::Vector{Float64},
         x_overline::Vector{Float64},
         time_start::UInt,
@@ -21,9 +21,9 @@ end
 
 
 """
-    recursiverounding!(x_tilde::Vector{Float64}, x_overline::Vector{Float64},
+    recursive_rounding!(x_tilde::Vector{Float64}, x_overline::Vector{Float64},
         time_start::UInt, total_time_limit::Float64, _indices::Vector{Int},
-        model::CPLEX.Model, indices::Vector{Int},
+        model::Model, indices::Vector{Int},
         objective_function::Vector{Float64})
 
 The recursive rounding round to the nearest. If that's not a feasible solution
@@ -31,13 +31,13 @@ we try to found one fixing less and less variables. Then we round it to the
 nearest. If that's still not a solution less variables are fixed and try again.
     See https://doi.org/10.1016/j.cor.2013.09.008
 """
-function recursiverounding!(
+function recursive_rounding!(
         x_tilde::Vector{Float64},
         x_overline::Vector{Float64},
         time_start::UInt,
         total_time_limit::Float64,
         _indices::Vector{Int},
-        model::CPLEX.Model,
+        model::Model,
         indices::Vector{Int},
         objective_function::Vector{Float64},
         opts...
@@ -97,20 +97,28 @@ function recursiverounding!(
 end
 
 """
-    sortReducedCosts!(indices::Vector{Int}, model::CPLEX.Model)
 
-sortReducedCosts sort indices by decreasing absolute reduced costs for model.
+
+
 """
-function sortReducedCosts!(
-        indices::Vector{Int},
-        model::CPLEX.Model
-    )
-    reducedCosts = Vector{Tuple{Int, Float64}}()
-    reducedCostsInit = CPLEX.get_reduced_costs(model)
+function get_all_reduced_costs(model::Model)
+
+
+    return reduced_costs
+end
+
+"""
+    sort_reduced_costs!(indices::Vector{Int}, model::Model)
+
+Sort indices by decreasing absolute reduced costs for model.
+"""
+function sort_reduced_costs!(indices::Vector{Int}, model::Model)
+    reduced_costs = Vector{Tuple{Int, Float64}}()
+    reduced_costs_init = get_all_reduced_costs(model)
     for i in indices
-        push!(reducedCosts, (i, abs(reducedCostsInit[i])))
+        push!(reduced_costs, (i, abs(reduced_costs_init[i])))
     end
-    sort!(reducedCosts, by = x -> x[2], rev=false)
-    indices = first.(reducedCosts)
+    sort!(reduced_costs, by = x -> x[2], rev=false)
+    indices = first.(reduced_costs)
     return indices
 end

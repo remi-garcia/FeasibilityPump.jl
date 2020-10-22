@@ -1,38 +1,34 @@
 mutable struct ParametersFP
-    roundingMethod::Int
-    projectionMethod::Int
-    perturbationMethod::Int
-    restartMethod::Int
+    rounding_method::Int
+    projection_method::Int
+    perturbation_method::Int
+    restart_method::Int
     presolve::Int
     improve::Bool
-    logLevel::Bool
-    timelim::Float64
-    recursiveRounding::Int
+    recursive_rounding::Int
     TT::Bool
     TTmin::Int
     TTmax::Int
-    feasibilityCheck::Int # 0: both check, 1: only isfeasible_xOverline, 2: only isfeasible_xTilde
+    feasibility_check::Int # 0: both check, 1: only isfeasible_xOverline, 2: only isfeasible_xTilde
     restart::Int
-    checkCycle::Int
+    check_cycle::Int
 
     function ParametersFP()
-        param = new()
-        param.roundingMethod = 0
-        param.projectionMethod = 0
-        param.perturbationMethod = 0
-        param.restartMethod = 0
-        param.presolve = 0
-        param.improve = false
-        param.logLevel = false
-        param.timelim = 30.0
-        param.recursiveRounding = 0
-        param.TT = true
-        param.TTmin = 10
-        param.TTmax = 30
-        param.feasibilityCheck = 1
-        param.restart = 100
-        param.checkCycle = 3
-        return param
+        parameter = new()
+        parameter.rounding_method = 0
+        parameter.projection_method = 0
+        parameter.perturbation_method = 0
+        parameter.restart_method = 0
+        parameter.presolve = 0
+        parameter.improve = false
+        parameter.recursive_rounding = 0
+        parameter.TT = true
+        parameter.TTmin = 10
+        parameter.TTmax = 30
+        parameter.feasibility_check = 1
+        parameter.restart = 100
+        parameter.check_cycle = 3
+        return parameter
     end
 end
 
@@ -40,60 +36,42 @@ end
 #-----
 #-------------------------------------------------------------------------------
 function feasibilitypump(
-        model::CPLEX.Model,
-        param::ParametersFP
+        model::Model,
+        parameter::ParametersFP
     )
     timeStart = time_ns()
 
-    roundingmethod! = whichRounding[0]
-    projectionmethod = whichProjection[0]
-    perturbmethod! = whichPerturb[0]
-    restartmethod! = whichRestart[0]
+    rounding_method! = which_rounding[0]
+    projection_method = which_projection[0]
+    perturbmethod! = which_perturb[0]
+    restart_method! = which_restart[0]
     try
-        roundingmethod! = whichRounding[param.roundingMethod]
+        rounding_method! = which_rounding[parameter.rounding_method]
     catch
-        @warn("Invalid parameter for roundingMethod, default used")
+        @warn("Invalid parameter for rounding_method, default used")
     end
     try
-        projectionmethod = whichProjection[param.projectionMethod]
+        projection_method = which_projection[parameter.projection_method]
     catch
-        @warn("Invalid parameter for projectionMethod, default used")
+        @warn("Invalid parameter for projection_method, default used")
     end
     try
-        perturbmethod! = whichPerturb[param.perturbationMethod]
+        perturbmethod! = which_perturb[parameter.perturbation_method]
     catch
-        @warn("Invalid parameter for perturbationMethod, default used")
+        @warn("Invalid parameter for perturbation_method, default used")
     end
     try
-        restartmethod! = whichRestart[param.restartMethod]
+        restart_method! = which_restart[parameter.restart_method]
     catch
-        @warn("Invalid parameter for perturbationMethod, default used")
+        @warn("Invalid parameter for perturbation_method, default used")
     end
-    restart = param.restart
+    restart = parameter.restart
     pasRestart = 0
-    checkCycle = param.checkCycle
-    presolve = param.presolve
-    improve = param.improve
-    total_time_limit = param.timelim
-    feasibilityCheck = param.feasibilityCheck
-
-    getData = param.logLevel
-
-    # For getData
-    myData = Vector{Float64}([
-        0.0, # Percentage of variables fixed with presolve      1
-        0.0, # Time for presolve                                2
-        0.0, # Time for first linear relaxation                 3
-        0.0, # Average time for projection                      4
-        0.0, # Number of perturbation                           5
-        0.0, # Average time for perturbation                    6
-        0.0, # Average time for rounding                        7
-        0.0, # Average time for scatter search                  8
-        0.0, # Average time for feasibility check               9
-        0.0, # Number of iterations                            10
-        0.0, # Time for improve                                11
-        0.0, # Number of feasibility checks                    12
-    ])
+    check_cycle = parameter.check_cycle
+    presolve = parameter.presolve
+    improve = parameter.improve
+    total_time_limit = parameter.time_limit
+    feasibility_check = parameter.feasibility_check
 
     LPMethod_init = CPLEX.get_param(model.env, "CPX_PARAM_LPMETHOD")
     CPLEX.set_param!(model.env, "CPX_PARAM_LPMETHOD", 1)
@@ -115,7 +93,7 @@ function feasibilitypump(
     end
 
     saveSol = Vector{Vector{Float64}}()
-    for i in 1:(checkCycle-1)
+    for i in 1:(check_cycle-1)
         push!(saveSol, zeros(Float64, nb_variables))
     end
     saveVect = 0
@@ -127,28 +105,28 @@ function feasibilitypump(
         objective_function = -objective_function
     end
 
-    # This is only useful for recursiverounding!
+    # This is only useful for recursive_rounding!
     sortBinVariables = false
     sortBinVariablesOnce = false
     objectiveFunctionRR = zeros(Float64, nb_variables)
-    if param.recursiveRounding == 1
+    if parameter.recursive_rounding == 1
         sortBinVariables = true
         sortBinVariablesOnce = true
-    elseif param.recursiveRounding == 2
+    elseif parameter.recursive_rounding == 2
         sortBinVariables = true
         sortBinVariablesOnce = false
-    elseif param.recursiveRounding == 3
+    elseif parameter.recursive_rounding == 3
         sortBinVariables = true
         sortBinVariablesOnce = true
         objectiveFunctionRR .= initial_objective_function
-    elseif param.recursiveRounding == 4
+    elseif parameter.recursive_rounding == 4
         sortBinVariables = true
         sortBinVariablesOnce = false
         objectiveFunctionRR .= initial_objective_function
-    elseif param.recursiveRounding == 0
+    elseif parameter.recursive_rounding == 0
         #Nothing
     else
-        @warn "Parameter recursiveRounding has an unauthorized value, parameter ignored"
+        @warn "Parameter recursive_rounding has an unauthorized value, parameter ignored"
     end
 
     #=--------------------------------------------------------------------------
@@ -160,84 +138,76 @@ function feasibilitypump(
     nConstr = length(rhs)
 
     if presolve != 0
-        timeTmp = @timed begin
-            nBin = length(indices)
-            indicesTmp = falses(nBin)
-            for ind in 1:indices
-                i = indices[ind]
-                fixed = true
-                val = -1
-                for j in A.rowval[nzrange(A, i)]
-                    if senses[j] == 76
-                        if val == -1
-                            if A[j,i] < 0
-                                val = 1
-                            elseif A[j,i] > 0
-                                val = 0
-                            end
-                        elseif val == 0
-                            if A[j,i] < 0
-                                fixed = false
-                                break
-                            end
-                        elseif val == 1
-                            if A[j,i] > 0
-                                fixed = false
-                                break
-                            end
+        nBin = length(indices)
+        indicesTmp = falses(nBin)
+        for ind in 1:indices
+            i = indices[ind]
+            fixed = true
+            val = -1
+            for j in A.rowval[nzrange(A, i)]
+                if senses[j] == 76
+                    if val == -1
+                        if A[j,i] < 0
+                            val = 1
+                        elseif A[j,i] > 0
+                            val = 0
                         end
-                    elseif senses[j] == 71
-                        if val == -1
-                            if A[j,i] > 0
-                                val = 1
-                            elseif A[j,i] < 0
-                                val = 0
-                            end
-                        elseif val == 0
-                            if A[j,i] > 0
-                                fixed = false
-                                break
-                            end
-                        elseif val == 1
-                            if A[j,i] < 0
-                                fixed = false
-                                break
-                            end
+                    elseif val == 0
+                        if A[j,i] < 0
+                            fixed = false
+                            break
                         end
-                    elseif senses[j] == 69
-                        fixed = false
-                        break
+                    elseif val == 1
+                        if A[j,i] > 0
+                            fixed = false
+                            break
+                        end
                     end
-                end
-                if fixed
-                    if presolve == 1 || (val == 0 && objective_function[i] >= 0) || (val == 1 && objective_function[i] <= 0)
-                        varLB[i] = val
-                        varUB[i] = val
-                        indicesTmp[ind] = true
+                elseif senses[j] == 71
+                    if val == -1
+                        if A[j,i] > 0
+                            val = 1
+                        elseif A[j,i] < 0
+                            val = 0
+                        end
+                    elseif val == 0
+                        if A[j,i] > 0
+                            fixed = false
+                            break
+                        end
+                    elseif val == 1
+                        if A[j,i] < 0
+                            fixed = false
+                            break
+                        end
                     end
+                elseif senses[j] == 69
+                    fixed = false
+                    break
                 end
             end
-            CPLEX.set_varLB!(model, varLB)
-            CPLEX.set_varUB!(model, varUB)
-            deleteat!(indices, indicesTmp)
-            if getData
-                myData[1] = (nBin-length(indices))*100/nBin
+            if fixed
+                if presolve == 1 || (val == 0 && objective_function[i] >= 0) || (val == 1 && objective_function[i] <= 0)
+                    varLB[i] = val
+                    varUB[i] = val
+                    indicesTmp[ind] = true
+                end
             end
         end
-        if getData
-            myData[2] = timeTmp[2]
-        end
+        CPLEX.set_varLB!(model, varLB)
+        CPLEX.set_varUB!(model, varUB)
+        deleteat!(indices, indicesTmp)
     end
 
     indicesRR = copy(indices)
     A = sparse(A') # This transpose makes feasibility check much faster
 
-    if param.TT
-        TTmin = param.TTmin
-        TTmax = param.TTmax
+    if parameter.TT
+        TTmin = parameter.TTmin
+        TTmax = parameter.TTmax
     else
-        TTmin = round(Int, length(indices)*param.TTmin/100, RoundDown)
-        TTmax = round(Int, length(indices)*param.TTmax/100, RoundUp)
+        TTmin = round(Int, length(indices)*parameter.TTmin/100, RoundDown)
+        TTmax = round(Int, length(indices)*parameter.TTmax/100, RoundUp)
     end
     if TTmin > length(indices)
         TTmin = length(indices)
@@ -248,7 +218,7 @@ function feasibilitypump(
     if TTmin > TTmax
         @warn "TTmin is greater than TTmax, parameters are switched"
         TTmin = TTmax
-        TTmax = param.TTmin
+        TTmax = parameter.TTmin
     end
 
     problemType_init = CPLEX.get_prob_type(model)
@@ -274,29 +244,18 @@ function feasibilitypump(
     First linear relaxation, rounding and feasibility check
     --------------------------------------------------------------------------=#
     #CPLEX.set_obj!(model, zeros(Float64, nb_variables))
-    timeLim_init = CPLEX.get_param(model.env, "CPX_PARAM_TILIM")
-    timeTmp = @timed begin
-        CPLEX.set_param!(model.env, "CPX_PARAM_TILIM", maximum([0, total_time_limit - (time_ns() - timeStart) / 1.0e9]))
-        CPLEX.optimize!(model)
+    time_limit_init = CPLEX.get_param(model.env, "CPX_PARAM_TILIM")
+    CPLEX.set_param!(model.env, "CPX_PARAM_TILIM", maximum([0, total_time_limit - (time_ns() - timeStart) / 1.0e9]))
+    CPLEX.optimize!(model)
 
-        xOverline = zeros(Float64, nb_variables)
-        if CPLEX.get_status(model) == :CPX_STAT_OPTIMAL
-            xOverline = CPLEX.get_solution(model)
-        end
-    end
-    if getData
-        myData[3] = timeTmp[2]
+    xOverline = zeros(Float64, nb_variables)
+    if CPLEX.get_status(model) == :CPX_STAT_OPTIMAL
+        xOverline = CPLEX.get_solution(model)
     end
 
     isFeasible = false
-    if feasibilityCheck != 2
+    if feasibility_check != 2
         isFeasible = isfeasible_xOverline(xOverline, indices, timeStart, total_time_limit)
-    end
-    if feasibilityCheck != 2
-        if getData
-            myData[9] += timeTmp[2]
-            myData[12] += 1.0
-        end
     end
     nIter = 0
     xTilde = zeros(Float64, nb_variables)
@@ -311,27 +270,15 @@ function feasibilitypump(
 
         CPLEX.set_sense!(model, :Min)
 
-        timeTmp = @timed begin
-            roundingmethod!(xTilde, xOverline, timeStart, total_time_limit, indices, model, indicesRR, objectiveFunctionRR)
-        end
+        rounding_method!(xTilde, xOverline, timeStart, total_time_limit, indices, model, indicesRR, objectiveFunctionRR)
         xTildeBis = copy(xTilde)
         for i in indices
             if xTilde[i] > 0.5
                 freqRound[i] += 1
             end
         end
-        if getData
-            myData[7] += timeTmp[2]
-        end
-
-        timeTmp = @timed if feasibilityCheck != 1
+        if feasibility_check != 1
             isFeasible = isfeasible_xTilde(xTilde, A, senses, rhs, timeStart, total_time_limit)
-        end
-        if feasibilityCheck != 1
-            if getData
-                myData[9] += timeTmp[2]
-                myData[12] += 1.0
-            end
         end
     else
         xTilde .= xOverline
@@ -344,20 +291,9 @@ function feasibilitypump(
         nIter += 1
         pasRestart += 1
         alpha *= alphaChange
-        timeTmp = @timed begin
-            xOverline = projectionmethod(model, timeStart, total_time_limit, xTilde, indices, objective_function, alpha, coef)
-        end
-        if getData
-            myData[4] += timeTmp[2]
-        end
-        timeTmp = @timed if feasibilityCheck != 2
+        xOverline = projection_method(model, timeStart, total_time_limit, xTilde, indices, objective_function, alpha, coef)
+        feasibility_check != 2
             isFeasible = isfeasible_xOverline(xOverline, indices, timeStart, total_time_limit)
-        end
-        if feasibilityCheck != 2
-            if getData
-                myData[9] += timeTmp[2]
-                myData[12] += 1.0
-            end
         end
 
         if !isFeasible
@@ -365,33 +301,22 @@ function feasibilitypump(
                 sortReducedCosts!(indicesRR, model)
             end
 
-            timeTmp = @timed begin
-                roundingmethod!(xTildeBis, xOverline, timeStart, total_time_limit, indices, model, indicesRR, objectiveFunctionRR)
-            end
-            if getData
-                myData[7] += timeTmp[2]
-            end
+            rounding_method!(xTildeBis, xOverline, timeStart, total_time_limit, indices, model, indicesRR, objectiveFunctionRR)
             if pasRestart == restart
                 pasRestart = 0
-                restartmethod!(xTildeBis, xOverline, indices)
+                restart_method!(xTildeBis, xOverline, indices)
             end
             if xTildeBis == xTilde
-                timeTmp = @timed begin
-                    perturbmethod!(xTildeBis, xOverline, indices, TTmin, TTmax, freqRound, nIter)
-                end
-                if getData
-                    myData[5] += 1
-                    myData[6] += timeTmp[2]
-                end
+                perturbmethod!(xTildeBis, xOverline, indices, TTmin, TTmax, freqRound, nIter)
             else
                 if xTildeBis in saveSol
                     pasRestart = 0
-                    restartmethod!(xTildeBis, xOverline, indices)
+                    restart_method!(xTildeBis, xOverline, indices)
                 end
             end
-            if checkCycle > 1
+            if check_cycle > 1
                 saveSol[saveVect+1] .= xTildeBis
-                saveVect = mod(saveVect+1, checkCycle-1)
+                saveVect = mod(saveVect+1, check_cycle-1)
             end
             xTilde = copy(xTildeBis)
 
@@ -400,14 +325,8 @@ function feasibilitypump(
                     freqRound[i] += 1
                 end
             end
-            timeTmp = @timed if feasibilityCheck != 1
+            if feasibility_check != 1
                 isFeasible = isfeasible_xTilde(xTilde, A, senses, rhs, timeStart, total_time_limit)
-            end
-            if feasibilityCheck != 1
-                if getData
-                    myData[9] += timeTmp[2]
-                    myData[12] += 1.0
-                end
             end
         else
             xTilde .= xOverline
@@ -419,7 +338,7 @@ function feasibilitypump(
     if isFeasible
         status = :SOL_FOUND
         objVal = sum(initial_objective_function .* xTilde)
-        timeTmp = @timed if improve
+        if improve
             CPLEX.set_sense!(model, objSense_init)
             CPLEX.set_obj!(model, initial_objective_function)
             varLB = CPLEX.get_varLB(model)
@@ -437,23 +356,9 @@ function feasibilitypump(
                 xTilde = CPLEX.get_solution(model)
                 objVal = CPLEX.get_objval(model)
             end
-            if getData
-                myData[11] = timeTmp[2]
-            end
         end
     else
         xTilde = repeat([NaN], nb_variables)
-    end
-
-    if getData
-        myData[4] /= nIter
-        myData[6] /= myData[5]
-        myData[7] /= nIter+1
-        myData[8] /= nIter-1
-        myData[9] /= myData[12]
-        myData[10] = nIter
-
-        println(myData)
     end
 
     #=--------------------------------------------------------------------------
@@ -468,13 +373,13 @@ function feasibilitypump(
     CPLEX.set_prob_type!(model, problemType_init)
     CPLEX.set_sense!(model, objSense_init)
     model.has_int = has_int_init
-    CPLEX.set_param!(model.env, "CPX_PARAM_TILIM", timeLim_init)
+    CPLEX.set_param!(model.env, "CPX_PARAM_TILIM", time_limit_init)
 
     return status, xTilde, objVal
 end
 
-feasibilitypump(model::CPLEX.Model) =
-    feasibilitypump(model, ParametersFP())
+feasibility_pump(model::Model) =
+    feasibility_pump(model, ParametersFP())
 
 
 
@@ -543,167 +448,149 @@ function isfeasible_xOverline(
 end
 
 
-function initializeparametersfp()
+function initialize_parameters_fp()
     return ParametersFP()
 end
 
 
-function setparamfp!(paramList::ParametersFP, param::Int, value::Int)
-    if param == 10
-        paramList.roundingMethod = value
-    elseif param == 20
-        paramList.projectionMethod = value
-    elseif param == 30
-        paramList.perturbationMethod = value
-    elseif param == 32
-        paramList.TTmin = value
-    elseif param == 33
-        paramList.TTmax = value
-    elseif param == 34
-        paramList.checkCycle = value
-    elseif param == 35
-        paramList.restart = value
-    elseif param == 2
-        paramList.timelim = Float64(value)
-    elseif param == 11
-        paramList.recursiveRounding = value
-    elseif param == 41
-        paramList.presolve = value
-    elseif param == 100
-        paramList.feasibilityCheck = value
-    elseif param == 1
+function setparameterfp!(parameters_list::ParametersFP, parameter::Int, value::Int)
+    if parameter == 10
+        parameters_list.rounding_method = value
+    elseif parameter == 20
+        parameters_list.projection_method = value
+    elseif parameter == 30
+        parameters_list.perturbation_method = value
+    elseif parameter == 32
+        parameters_list.TTmin = value
+    elseif parameter == 33
+        parameters_list.TTmax = value
+    elseif parameter == 34
+        parameters_list.check_cycle = value
+    elseif parameter == 35
+        parameters_list.restart = value
+    elseif parameter == 2
+        parameters_list.time_limit = Float64(value)
+    elseif parameter == 11
+        parameters_list.recursive_rounding = value
+    elseif parameter == 41
+        parameters_list.presolve = value
+    elseif parameter == 100
+        parameters_list.feasibility_check = value
+    elseif parameter == 31
         try
-            paramList.logLevel = Bool(value)
+            parameters_list.TT = Bool(value)
         catch
-            @warn("The parameter "*string(param)*" can take only 0 or 1")
+            @warn("The parameter $parameter can take only 0 or 1, nothing happened")
         end
-    elseif param == 31
+    elseif parameter == 42
         try
-            paramList.TT = Bool(value)
+            parameters_list.improve = Bool(value)
         catch
-            @warn("The parameter "*string(param)*" can take only 0 or 1")
-        end
-    elseif param == 42
-        try
-            paramList.improve = Bool(value)
-        catch
-            @warn("The parameter "*string(param)*" can take only 0 or 1")
+            @warn("The parameter $parameter can take only 0 or 1, nothing happened")
         end
     else
-        @warn("The parameter "*string(param)*" doesn't exist")
+        @warn("The parameter $parameter does not exist, nothing happened")
     end
-    return paramList
+    return parameters_list
 end
 
-function setparamfp!(paramList::ParametersFP, param::Int, value::Float64)
-    if param == 10
-        paramList.roundingMethod = round(Int, value)
-    elseif param == 20
-        paramList.projectionMethod = round(Int, value)
-    elseif param == 30
-        paramList.perturbationMethod = round(Int, value)
-    elseif param == 32
-        paramList.TTmin = round(Int, value)
-    elseif param == 33
-        paramList.TTmax = round(Int, value)
-    elseif param == 34
-        paramList.checkCycle = round(Int, value)
-    elseif param == 35
-        paramList.restart = round(Int, value)
-    elseif param == 2
-        paramList.timelim = value
-    elseif param == 11
-        paramList.recursiveRounding = round(Int, value)
-    elseif param == 41
-        paramList.presolve = round(Int, value)
-    elseif param == 100
-        paramList.feasibilityCheck = round(Int, value)
-    elseif param == 1
+function setparamfp!(parameters_list::ParametersFP, parameter::Int, value::Float64)
+    if parameter == 10
+        parameters_list.rounding_method = round(Int, value)
+    elseif parameter == 20
+        parameters_list.projection_method = round(Int, value)
+    elseif parameter == 30
+        parameters_list.perturbation_method = round(Int, value)
+    elseif parameter == 32
+        parameters_list.TTmin = round(Int, value)
+    elseif parameter == 33
+        parameters_list.TTmax = round(Int, value)
+    elseif parameter == 34
+        parameters_list.check_cycle = round(Int, value)
+    elseif parameter == 35
+        parameters_list.restart = round(Int, value)
+    elseif parameter == 11
+        parameters_list.recursive_rounding = round(Int, value)
+    elseif parameter == 41
+        parameters_list.presolve = round(Int, value)
+    elseif parameter == 100
+        parameters_list.feasibility_check = round(Int, value)
+    elseif parameter == 31
         try
-            paramList.logLevel = Bool(round(Int, value))
+            parameters_list.TT = Bool(round(Int, value))
         catch
-            @warn("The parameter "*string(param)*" can take only 0 or 1")
+            @warn("The parameter $parameter can take only 0 or 1, nothing happened")
         end
-    elseif param == 31
+    elseif parameter == 42
         try
-            paramList.TT = Bool(round(Int, value))
+            parameters_list.improve = Bool(round(Int, value))
         catch
-            @warn("The parameter "*string(param)*" can take only 0 or 1")
-        end
-    elseif param == 42
-        try
-            paramList.improve = Bool(round(Int, value))
-        catch
-            @warn("The parameter "*string(param)*" can take only 0 or 1")
+            @warn("The parameter $parameter can take only 0 or 1, nothing happened")
         end
     else
-        @warn("The parameter "*string(param)*" doesn't exist")
+        @warn("The parameter $parameter does not exist, nothing happened")
     end
-    return paramList
+    return parameters_list
 end
 
 
-function setparamfp!(paramList::ParametersFP, param::String, value::Union{Float64, Int})
-    if haskey(__paramToInt, param)
-        setparamfp!(paramList, __paramToInt[param], value)
+function setparamfp!(parameters_list::ParametersFP, parameter::String, value::Union{Float64, Int})
+    if haskey(__paramToInt, parameter)
+        setparamfp!(parameters_list, __paramToInt[parameter], value)
     else
-        @warn("The parameter "*string(param)*" doesn't exist")
+        @warn("The parameter $parameter does not exist, nothing happened")
     end
-    return paramList
+    return parameters_list
 end
 
 
-function getparamfp(paramList::ParametersFP, param::Int)
+function getparamfp(parameters_list::ParametersFP, parameter::Int)
     value = NaN
-    if param == 10
-        value = paramList.roundingMethod
-    elseif param == 20
-        value = paramList.projectionMethod
-    elseif param == 30
-        value = paramList.perturbationMethod
-    elseif param == 31
-        value = paramList.TT
-    elseif param == 32
-        value = paramList.TTmin
-    elseif param == 33
-        value = paramList.TTmax
-    elseif param == 34
-        value = paramList.checkCycle
-    elseif param == 35
-        value = paramList.restart
-    elseif param == 1
-        value = paramList.logLevel
-    elseif param == 2
-        value = paramList.timelim
-    elseif param == 11
-        value = paramList.recursiveRounding
-    elseif param == 41
-        value = paramList.presolve
-    elseif param == 100
-        value = paramList.feasibilityCheck
-    elseif param == 42
-        value = paramList.improve
+    if parameter == 10
+        value = parameters_list.rounding_method
+    elseif parameter == 20
+        value = parameters_list.projection_method
+    elseif parameter == 30
+        value = parameters_list.perturbation_method
+    elseif parameter == 31
+        value = parameters_list.TT
+    elseif parameter == 32
+        value = parameters_list.TTmin
+    elseif parameter == 33
+        value = parameters_list.TTmax
+    elseif parameter == 34
+        value = parameters_list.check_cycle
+    elseif parameter == 35
+        value = parameters_list.restart
+    elseif parameter == 11
+        value = parameters_list.recursive_rounding
+    elseif parameter == 41
+        value = parameters_list.presolve
+    elseif parameter == 100
+        value = parameters_list.feasibility_check
+    elseif parameter == 42
+        value = parameters_list.improve
     else
-        @warn("The parameter "*string(param)*" doesn't exist")
+        @warn("The parameter $parameter does not exist, nothing happened")
     end
     return value
 end
 
 
-function getparamfp(paramList::ParametersFP, param::String)
+function get_parameter_fp(parameters_list::ParametersFP, parameter::String)
     value = NaN
-    if haskey(__paramToInt, param)
-        value = getparamfp(paramList, __paramToInt[param])
+    if haskey(__paramToInt, parameter)
+        value = getparamfp(paramList, __paramToInt[parameter])
     end
     return value
 end
 
-function getparamnamefp(param::Int)
+function get_parameter_name_fp(parameter::Int)
     paramName = ""
-    if haskey(__paramToString, param)
-        paramName = __paramToString[param]
+    if haskey(__paramToString, parameter)
+        paramName = __paramToString[parameter]
     else
-        @warn("No parameter "*string(param))
+        @warn("No parameter $parameter")
     end
     return paramName
 end
